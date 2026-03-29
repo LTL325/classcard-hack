@@ -171,7 +171,7 @@ client.on("interactionCreate", async (interaction) => {
                         }
                     ]
                 }) as Message;
-                let i = await message.awaitMessageComponent({ filter: (i) => i.user.id === interaction.user.id, time: 0, componentType: ComponentType.Button }).then(async (inter) => {
+                let i = await message.awaitMessageComponent({ filter: (i: any) => i.user.id === interaction.user.id, time: 0, componentType: ComponentType.Button }).then(async (inter) => {
                     if (inter.customId !== "_yes") return false;
                     await channel.delete();
                     user.channelID = "";
@@ -206,7 +206,7 @@ client.on("interactionCreate", async (interaction) => {
                         }
                     ]
                 }) as Message;
-                let i = await message.awaitMessageComponent({ filter: (i) => i.user.id === interaction.user.id, time: 0, componentType: ComponentType.Button }).then(async (inter) => {
+                let i = await message.awaitMessageComponent({ filter: (i: any) => i.user.id === interaction.user.id, time: 0, componentType: ComponentType.Button }).then(async (inter) => {
                     if (inter.customId !== "_yes") return false;
                     user.id = "";
                     user.password = "";
@@ -322,7 +322,7 @@ client.on("interactionCreate", async (interaction) => {
                         }
                     ]
                 }) as Message;
-                let i: string | false = await message.awaitMessageComponent({ filter: (i) => i.user.id === interaction.user.id, time: 0, componentType: ComponentType.SelectMenu }).then((interaction) => interaction.values[0]).catch(() => false);
+                let i: string | false = await message.awaitMessageComponent({ filter: (i: any) => i.user.id === interaction.user.id, time: 0, componentType: ComponentType.SelectMenu }).then((interaction) => interaction.values[0]).catch(() => false);
                 if (!i) {
                     interaction.editReply({ embeds: [new EmbedBuilder().setTitle("❌ 알 수 없는 오류입니다.").setColor("Red")], components: [] });
                     return;
@@ -370,7 +370,7 @@ client.on("interactionCreate", async (interaction) => {
             } else if (["s_match_scramble", "s_crash"].includes(interaction.customId)) {
                 await interaction.editReply({ embeds: [new EmbedBuilder().setTitle("❓ 원하는 점수를 입력해주세요.").setColor("Yellow")] });
                 let collected: Collection<string, Message<boolean>> | false = await channel.awaitMessages({
-                    filter: (m) => m.author.id === interaction.user.id,
+                    filter: (m: Message) => m.author.id === interaction.user.id,
                     time: 30000,
                     max: 1,
                     errors: ["time"]
@@ -418,20 +418,11 @@ client.on("interactionCreate", async (interaction) => {
                     qbClasses[interaction.user.id].removeAllListeners();
                     delete qbClasses[interaction.user.id];
                 };
-                let message = await interaction.channel!.send({
+                let message = await (interaction.channel as TextChannel).send({
                     "embeds": [new EmbedBuilder().setTitle("❓ 배틀코드를 입력해주세요.").setColor("Yellow")],
-                    // "components": [{
-                    //     "type": 1,
-                    //     "components": [{
-                    //         "type": 2,
-                    //         "label": "🗑️ 메세지 지우기",
-                    //         "style": 4,
-                    //         "customId": "_delete_message|" + interaction.user.id + "|q"
-                    //     }]
-                    // }]
                 });
                 let collected: Collection<string, Message<boolean>> | false = await channel.awaitMessages({
-                    filter: (m) => m.author.id === interaction.user.id,
+                    filter: (m: Message) => m.author.id === interaction.user.id,
                     time: 30000,
                     max: 1,
                     errors: ["time"]
@@ -441,7 +432,7 @@ client.on("interactionCreate", async (interaction) => {
                 let battleCode = Number(collected.first()?.content);
                 await message.edit({ "embeds": [new EmbedBuilder().setTitle("❓ 표시될 이름을 입력해주세요.").setColor("Yellow")] });
                 collected = await channel.awaitMessages({
-                    filter: (m) => m.author.id === interaction.user.id,
+                    filter: (m: Message) => m.author.id === interaction.user.id,
                     time: 30000,
                     max: 1,
                     errors: ["time"]
@@ -486,23 +477,13 @@ client.on("interactionCreate", async (interaction) => {
                                         "style": 4,
                                         "customId": "_quiz_battle_answer|wrong"
                                     }]
-                                },
-                                    // {
-                                    //     "type": 1,
-                                    //     "components": [{
-                                    //         "type": 2,
-                                    //         "label": "🗑️ 메세지 지우기",
-                                    //         "style": 4,
-                                    //         "customId": "_delete_message|" + interaction.user.id + "|q"
-                                    //     }]
-                                    // }
-                                ]
+                                }]
                             }).catch(() => end = true);
                             await message.awaitMessageComponent({
-                                filter: (m) => m.user.id === interaction.user.id,
+                                filter: (m: any) => m.user.id === interaction.user.id,
                                 time: 0,
                                 componentType: ComponentType.Button,
-                            }).then(async i => {
+                            }).then(async (i: any) => {
                                 next = (i.customId.endsWith("correct") ? quizBattle.mark(true) : quizBattle.mark(false)).nextQuestion;
                                 await i.deferUpdate();
                             }).catch(() => end = true);
@@ -525,20 +506,11 @@ client.on("interactionCreate", async (interaction) => {
                 await message.edit({ embeds: [new EmbedBuilder().setTitle("⌛ 배틀 시작을 기다리는 중입니다.").setColor("Aqua")] });
             } else if (interaction.customId === "_quiz_battle_crash") {
                 interaction.deferUpdate();
-                let message = await interaction.channel!.send({
+                let message = await (interaction.channel as TextChannel).send({
                     "embeds": [new EmbedBuilder().setTitle("❓ 배틀코드를 입력해주세요.").setColor("Yellow")],
-                    // "components": [{
-                    //     "type": 1,
-                    //     "components": [{
-                    //         "type": 2,
-                    //         "label": "🗑️ 메세지 지우기",
-                    //         "style": 4,
-                    //         "customId": "_delete_message|" + interaction.user.id
-                    //     }]
-                    // }]
                 });
                 let collected: Collection<string, Message<boolean>> | false = await channel.awaitMessages({
-                    filter: (m) => m.author.id === interaction.user.id,
+                    filter: (m: Message) => m.author.id === interaction.user.id,
                     time: 30000,
                     max: 1,
                     errors: ["time"]
@@ -548,7 +520,7 @@ client.on("interactionCreate", async (interaction) => {
                 let battleCode = Number(collected.first()?.content);
                 await message.edit({ "embeds": [new EmbedBuilder().setTitle("❓ 표시될 이름을 입력해주세요.").setColor("Yellow")] });
                 collected = await channel.awaitMessages({
-                    filter: (m) => m.author.id === interaction.user.id,
+                    filter: (m: Message) => m.author.id === interaction.user.id,
                     time: 30000,
                     max: 1,
                     errors: ["time"]
@@ -581,11 +553,6 @@ client.on("interactionCreate", async (interaction) => {
                     interaction.reply({ embeds: [new EmbedBuilder().setTitle("❌ 잘못된 접근입니다.").setColor("Red")], ephemeral: true });
                     return;
                 };
-                // if (interaction.customId.split("|")[2] === "q" && qbClasses[interaction.user.id]) {
-                //     qbClasses[interaction.user.id].leave();
-                //     qbClasses[interaction.user.id].removeAllListeners();
-                //     delete qbClasses[interaction.user.id];
-                // };
                 (interaction.message as Message).delete();
             };
         } else if (interaction.isModalSubmit()) {
@@ -620,7 +587,13 @@ client.on("interactionCreate", async (interaction) => {
             };
         };
     } catch (e) {
-        if (e instanceof Error && interaction.isRepliable()) interaction[interaction.replied ? "editReply" : "reply"]({ embeds: [new EmbedBuilder().setTitle(`❌ ${e.message}`).setColor("Red")], ephemeral: true }).catch(() => false);
+        if (e instanceof Error && interaction.isRepliable()) {
+            if (interaction.replied) {
+                interaction.editReply({ embeds: [new EmbedBuilder().setTitle(`❌ ${e.message}`).setColor("Red")] }).catch(() => false);
+            } else {
+                interaction.reply({ embeds: [new EmbedBuilder().setTitle(`❌ ${e.message}`).setColor("Red")], ephemeral: true }).catch(() => false);
+            }
+        }
     };
 });
 
@@ -794,15 +767,7 @@ async function updateMessage(message: any, userID: string, s: string): Promise<M
                 "style": 3,
                 "customId": "s_match_scramble",
                 "disabled": disabled
-            },
-                // {
-                //     "type": 2,
-                //     "label": "크래시 게임",
-                //     "style": 3,
-                //     "customId": "s_crash",
-                //     "disabled": disabled
-                // }
-            );
+            });
         };
         if (disableMode !== "idPass") components.push({
             "type": 1,
