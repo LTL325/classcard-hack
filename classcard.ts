@@ -41,6 +41,7 @@ export { ClassCard, learningType, Activity, setType };
 
 export default class ClassCard {
     private client: Axios;
+    private cookieJar: { [key: string]: string } = {};
     public set: {
         id: number,
         name: string,
@@ -77,21 +78,50 @@ export default class ClassCard {
                 "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
                 "Referer": "https://www.classcard.net/",
             },
-            withCredentials: true,
+            maxRedirects: 5,
         });
         this.set = { id: 0, name: "", type: 0, study_data: [] };
         this.class = { id: 0, name: "" };
         this.user = { name: "", id: 0, token: "", isPro: false, isTeacher: false };
         this.folders = [];
         this.classes = [];
+        this._setupCookieInterceptors();
+    };
+
+    // Node.js에서 axios는 withCredentials로 쿠키를 자동 유지하지 않음
+    // Set-Cookie 헤더를 수동으로 추적해서 Cookie 헤더로 재전송
+    private _setupCookieInterceptors() {
+        this.client.interceptors.response.use((res) => {
+            const setCookies: string[] = (res.headers['set-cookie'] as string[]) || [];
+            setCookies.forEach((cookieStr: string) => {
+                const [nameVal] = cookieStr.split(';');
+                const eqIdx = nameVal.indexOf('=');
+                if (eqIdx > -1) {
+                    this.cookieJar[nameVal.slice(0, eqIdx).trim()] = nameVal.slice(eqIdx + 1).trim();
+                }
+            });
+            return res;
+        });
+        this.client.interceptors.request.use((config) => {
+            const cookieStr = Object.entries(this.cookieJar).map(([k, v]) => `${k}=${v}`).join('; ');
+            if (cookieStr) {
+                config.headers = config.headers || {};
+                (config.headers as any)['Cookie'] = cookieStr;
+            }
+            return config;
+        });
     };
 
     async login(id: string, password: string) {
         try {
-            // 세션 쿠키 초기화
+            // 쿠키 jar 초기화
+            this.cookieJar = {};
+
+            // Step 1: Login 페이지 방문 → 초기 ci_session 쿠키 획득
             await this.client.get("https://www.classcard.net/Login").catch(() => {});
 
-            // LoginProc으로 로그인 (세션 쿠키 기반)
+            // Step 2: LoginProc으로 로그인
+            // interceptor가 Set-Cookie를 자동으로 cookieJar에 저장함
             const res: AxiosResponse = await this.client.post(
                 "https://www.classcard.net/LoginProc",
                 `login_id=${encodeURIComponent(id)}&login_pwd=${encodeURIComponent(password)}`
@@ -106,12 +136,21 @@ export default class ClassCard {
                 throw new Error(msgMap[res.data.msg] || "로그인 실패: " + (res.data.msg || "알 수 없는 오류"));
             }
 
-            // 메인 페이지에서 user 정보 추출
-            const mainRes: AxiosResponse = await this.client.get("https://www.classcard.net/Main");
+            // Step 3: Main 페이지에서 user 정보 추출
+            // interceptor가 Cookie 헤더를 자동으로 포함시켜 세션 유지
+            const mainRes: AxiosResponse = await this.client.get(
+                "https://www.classcard.net/Main",
+                { maxRedirects: 0, validateStatus: (s) => s < 400 }
+            ).catch(async () => {
+                // Main이 redirect(307)되면 직접 따라감
+                return await this.client.get("https://www.classcard.net/Main");
+            });
             const html: string = mainRes.data as string;
 
             const userIdxMatch = html.match(/var c_u\s*=\s*(\d+)/);
-            if (!userIdxMatch || userIdxMatch[1] === "0") throw new Error("사용자 정보를 가져올 수 없습니다. (1)");
+            if (!userIdxMatch || userIdxMatch[1] === "0") {
+                throw new Error("사용자 정보를 가져올 수 없습니다. (1) - 로그인 세션이 유지되지 않았습니다.");
+            }
             this.user.id = Number(userIdxMatch[1]);
 
             const nameMatch = html.match(/var user_name\s*=\s*['"]([^'"]+)['"]/);
