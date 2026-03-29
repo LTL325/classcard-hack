@@ -3,6 +3,7 @@ import Websocket from "ws";
 import EventEmitter from "events";
 import { URLSearchParams } from "url";
 
+
 enum setType {
     "word" = 1,     // 단어
     "term",          // 용어
@@ -185,44 +186,30 @@ export default class ClassCard {
 
             while (true) {
                 before = percentageCheck ? (await this.getTotal().then(t => t?.data ? (t.data[type as keyof typeof t.data] as number) : 0) ?? 0) : 0;
-                let params = new URLSearchParams();
-                let ts = ClassCard.getTimestamp(Date.now());
-                let p: any = {
-                    "base_info": {
-                        "s_ts": ts,
-                        "set_idx": String(this.set.id),
-                        "user_idx": this.user.id
-                    },
-                    "req_data": {
-                        "fm_user_card_log": [{
-                            "activity": activity,
-                            "card_idx": -1,
-                            "class_idx": this.class.id,
-                            "deleted": 0,
-                            "score": (Math.floor(before / 100) + 1),
-                            "set_idx": this.set.id,
-                            "ts": ts,
-                            "user_idx": this.user.id
-                        }],
-                        "fm_user_class_learn_set": [],
-                        "fm_user_play_score": [],
-                        "fm_user_set_log": []
-                    }
-                };
-                for (const card of this.set.study_data) p.req_data.fm_user_card_log.push({
-                    "activity": activity,
-                    "card_idx": card.card_idx,
-                    "class_idx": this.class.id,
-                    "deleted": 1,
-                    "score": 1,
-                    "set_idx": this.set.id,
-                    "ts": ts,
-                    "user_idx": this.user.id
-                });
-                params.append("p", JSON.stringify(p));
 
-                // www 기반으로 전환
-                await this.client.post(`https://www.classcard.net/sync/upsync_user_study_log`, params).catch(() => false);
+                // ViewSetAsync/learnAll 방식 사용 (sync/upsync는 로그인 세션 없이 code:304로 실제 저장 안 됨)
+                // 웹 클라이언트가 실제로 사용하는 엔드포인트
+                const params = new URLSearchParams();
+                params.append("set_idx_2", String(this.set.id));
+                for (const card of this.set.study_data) {
+                    params.append("card_idx[]", String(card.card_idx));
+                    params.append("score[]", "1");
+                }
+                params.append("activity", String(activity));
+                params.append("last_section", "1");
+                params.append("last_round", "1");
+                params.append("is_know_card", "0");
+                params.append("is_w_pro", "0");
+                params.append("view_cnt", String(this.set.study_data.length));
+                params.append("user_idx", String(this.user.id));
+
+                const learnRes: AxiosResponse | false = await this.client.post(
+                    "https://www.classcard.net/ViewSetAsync/learnAll", params
+                ).catch(() => false);
+
+                if (!learnRes || learnRes.data?.result !== "ok") {
+                    throw new Error("학습 기록 저장에 실패했습니다. (2)");
+                }
 
                 after = percentageCheck ? (await this.getTotal().then(t => t?.data ? (t.data[type as keyof typeof t.data] as number) : 0) ?? 0) : 0;
                 if (!percentageCheck || after > before) break;
@@ -240,56 +227,53 @@ export default class ClassCard {
             if (!this.set.id || !this.class.id) throw new Error("세트 아이디 또는 클래스 아이디를 설정해야합니다. (0)");
             if (![4, 5].includes(game)) throw new Error("지원하지 않는 게임입니다. (1)");
 
-            let params = new URLSearchParams();
-            params.append("p", JSON.stringify({
-                "base_info": { "s_ts": "", "set_idx": this.set.id.toString(), "user_idx": this.user.id.toString() },
-                "req_data": {
-                    "fm_user_card_log": [],
-                    "fm_user_class_learn_set": [],
-                    "fm_user_play_score": [{
-                        "activity": game,
-                        "class_idx": this.class.id,
-                        "score": score,
-                        "score_idx": 0,
-                        "set_idx": this.set.id,
-                        "user_idx": this.user.id
-                    }],
-                    "fm_user_set_log": []
-                }
-            }));
+            // Match/save 엔드포인트 사용 (웹 클라이언트 실제 방식)
+            // arr_score: score/100개의 {v:100,c:1} 항목
+            const send_data: { v: number, c: number }[] = [];
+            const itemCount = Math.min(Math.floor(score / 100), 25);
+            for (let i = 0; i < itemCount; i++) send_data.push({ v: 100, c: 1 });
+
+            const params = new URLSearchParams();
+            params.append("set_idx", String(this.set.id));
+            params.append("arr_key", "");
+            params.append("arr_score", JSON.stringify(send_data));
+            params.append("activity", String(game));
+            params.append("class_idx", String(this.class.id));
+            params.append("user_idx", String(this.user.id));
+            params.append("user_name", this.user.name || "");
+            params.append("tid", "");
 
             let res: AxiosResponse | false = await this.client.post(
-                `https://www.classcard.net/sync/upsync_user_study_log`, params
+                "https://www.classcard.net/Match/save", params
             ).catch(() => false);
-            if (!res || !res.data?.res_data || res.data.result.code !== 200 || res.data.res_data.fm_user_play_score != 1) {
-                throw new Error("알 수 없는 오류가 발생했습니다. (2)");
+
+            if (!res || res.data?.result !== "ok") {
+                throw new Error("게임 점수 저장에 실패했습니다. (2)");
             }
 
-            let s_ts = res.data.result.s_ts;
+            const savedScore = res.data.total_score || score;
             let rank: { [key: string]: string | number | null } = { "class": null, "all": null };
 
             if (fetchRank) {
                 try {
-                    let rankParams = new URLSearchParams();
-                    rankParams.append("user_idx", String(this.user.id));
-                    rankParams.append("class_idx", String(this.class.id));
+                    const rankParams = new URLSearchParams();
                     rankParams.append("set_idx", String(this.set.id));
+                    rankParams.append("class_idx", String(this.class.id));
                     rankParams.append("activity", String(game));
+                    rankParams.append("current_score", String(savedScore));
                     rankParams.append("limit", "100");
-                    rankParams.append("current_score", String(score));
                     let rankRes: AxiosResponse | false = await this.client.post(
-                        "https://www.classcard.net/ViewSetAsync/getRank", rankParams
+                        "https://www.classcard.net/Match/rank", rankParams
                     ).catch(() => false);
-                    if (rankRes && rankRes.data) {
-                        for (const t of ["class", "all"]) {
-                            const list = rankRes.data[t + "_rank_list"] || [];
-                            let r = list.find((x: any) => x.user_idx === String(this.user.id) && x.reg_date === s_ts);
-                            rank[t] = r ? r.rank : (t === "class" ? "오류" : "순위가 100등 보다 낮습니다.");
-                        };
+                    if (rankRes && rankRes.data?.result === "ok") {
+                        const rankList = rankRes.data.rank_list || [];
+                        const myEntry = rankList.find((x: any) => x.user_idx === String(this.user.id));
+                        rank["class"] = myEntry ? myEntry.rank : "순위 확인 불가";
+                        rank["all"] = rank["class"];
                     }
                 } catch {};
             };
-            return { success: true, message: "성공", data: { rank } };
+            return { success: true, message: "성공", data: { rank, score: savedScore } };
         } catch (e) {
             if (e instanceof Error) return { success: false, message: e.message, error: { message: e.message, stack: e.stack } };
         };
