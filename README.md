@@ -1,15 +1,15 @@
 # 📗 Classcard Hack
-⭐ This Repo for a cookie<br>
-언어: [![Language](https://img.shields.io/badge/Language-Node.js-brightgreen?logo=node.js&style=flat-square)](https://nodejs.org/ko)<br>
+Language: [![Language](https://img.shields.io/badge/Language-Node.js-brightgreen?logo=node.js&style=flat-square)](https://nodejs.org/ko)<br>
 **No abuse!!!**<br>
 Only for Education Purposes
 
-## 📙 설명
+## 📙 Explanation
 * Tools for Classcard but work with Discord bot
 <br>
 
-|기능 리스트|작동 여부|
+|Feature List|Working Status|
 |:----:|:----:|
+|Login to Account|✅|
 |Memorize Practice|-|
 |Recall Practice|-|
 |Spell Practice|-|
@@ -19,7 +19,7 @@ Only for Education Purposes
 |Quiz Battle|-|
 
 
-## 📄 사용법
+## 📄 How to use
 1. Compile index.ts
 2. Enter `node index.js` and edit the generated config.json file
 3. Enter `node index.js`
@@ -27,5 +27,12 @@ Only for Education Purposes
 5. Send `!setup` on discord server.
 6. Just do as the bot tells you in the `#사용` channel.
 
-## 📸 사진
+## 📸 ScreenShot
 ![SS](./images/Screenshot_2022-08-06_191853.png)
+
+## ℹ️ Credit
+First Made by [Ye0NSe0](https://github.com/Ye0NSe0)
+
+Updated to work for current classcard version by ME:)
+
+⭐ Please give a star to the [original author's repo](https://github.com/Ye0NSe0/classcard-hack) as well.<br>
